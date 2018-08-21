@@ -75,7 +75,7 @@ class ChatServer(threading.Thread):
                 user_and_message = data[1].split(maxsplit=1)
                 for c in self.client_pool:
                     if user_and_message[0] == c.nick:
-                        message = client.nick.encode() + b': ' + user_and_message[1].encode()
+                        message = client.nick.encode() + b' @dm: ' + user_and_message[1].encode()
                         c.conn.sendto(message, c.addr)
             else:
                 client.conn.sendall(b'Invalid Command, please try again. \n')
