@@ -2,9 +2,11 @@ from client import ChatClient
 import threading
 import socket
 import sys
+import random
 
 
-PORT = 5000
+PORT = random.randint(1000, 5000)
+
 
 
 class ChatServer(threading.Thread):
@@ -26,26 +28,24 @@ class ChatServer(threading.Thread):
             print('Bind failure {}'.format(socket.error))
             sys.exit()
 
-        self.server.listen(1)
+        self.server.listen(10)
 
 
-    def run_thread(self, client):
-        print('{} connected with {}:{}'.format(
-            client.nick, client.addr[0], str(client.addr[1])))
-        message = ''
+    def run_thread(self, id, nick, conn, addr):
+        print('{} connected with {}:{}'.format(nick, addr[0], str(addr[1])))
 
         try:
 
             while True:
-                data = client.conn.recv(4096)
-                message += data.decode()
+                data = conn.recv(4096)
+                self.parser(id, nick, conn, data)
                 # if len(data) < 4096:
                 #     break
 
         except (ConnectionResetError, BrokenPipeError, OSError):
-            client.conn.close()
+            conn.close()
 
-        self.parser(client.id, client.nick, client.conn, message)
+        # self.parser(client.id, client.nick, client.conn, message)
         # for cl in self.client_pool:
         #     cl.conn.sendall(message.encode())
 
@@ -53,24 +53,29 @@ class ChatServer(threading.Thread):
 
 
     def parser(self, id, nick, conn, message):
-        if message.startswith('@'):
-            data = message.split(maxsplit=1)
+        if message.decode().startswith('@'):
+            data = message.decode().split(maxsplit=1)
             if data[0] == '@quit':
-                conn.sendall('You have left the chatroom\n')
+                conn.sendall(b'You have left the chatroom\n')
                 reply = nick.encode() + b' has left the channel\n'
-                [c.conn.sendall(reply) for c in self.client_pool if len(self.client_pool) > 0]
+                [c.conn.sendall(reply) for c in self.client_pool if len(self.client_pool)]
                 self.client_pool = [c for c in self.client_pool if c.id != id]
                 conn.close()
+            elif data[0] == '@list':
+                user_list = []
+                for c in self.client_pool:
+                    user_list.append(str(c.nick))
+                conn.sendall(str(user_list).encode())
             else:
                 conn.sendall(b'Invalid Command, please try again. \n')
         else:
-            reply = nick.encode() + b': ' + message.encode()
+            reply = nick.encode() + b': ' + message
             # for cl in self.client_pool:
             #       if len(self.client_pool) > 0:
                     # cl.conn.sendall(reply)
             #     cl.conn.sendall(reply)
             # The line below is the exact same thing
-            [c.conn.sendall(reply) for c in self.client_pool if len(self.client_pool) > 0]
+            [c.conn.sendall(reply) for c in self.client_pool if len(self.client_pool)]
 
 
 
@@ -83,7 +88,7 @@ class ChatServer(threading.Thread):
             self.client_pool.append(client)
             threading.Thread(
                 target = self.run_thread,
-                args = (client, ),
+                args = (client.id, client.nick, client.conn, client.addr),
                 daemon = True
             ).start()
         pass
